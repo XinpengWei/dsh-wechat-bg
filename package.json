@@ -39,11 +39,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OWNER/dsh-wechat-bg.git"
+    "url": "git+https://github.com/XinpengWei/dsh-wechat-bg.git"
   },
-  "homepage": "https://github.com/OWNER/dsh-wechat-bg#readme",
+  "homepage": "https://github.com/XinpengWei/dsh-wechat-bg#readme",
   "bugs": {
-    "url": "https://github.com/OWNER/dsh-wechat-bg/issues"
+    "url": "https://github.com/XinpengWei/dsh-wechat-bg/issues"
   },
   "keywords": [
     "dsh",
