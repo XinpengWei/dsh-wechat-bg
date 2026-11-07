@@ -25,6 +25,7 @@ window.__ModuleLoader__.load({
       waitingHint: '这个窗口会自动刷新，不用手动操作',
       current: '当前背景',
       strength: '背景浓度',
+      sidebar: '侧栏浓度',
       display: '显示方式',
       fill: '铺满',
       whole: '完整',
@@ -77,6 +78,7 @@ window.__ModuleLoader__.load({
       waitingHint: 'This panel refreshes itself. No need to reload.',
       current: 'Current background',
       strength: 'Photo strength',
+      sidebar: 'Sidebar strength',
       display: 'Display',
       fill: 'Fill',
       whole: 'Whole',
@@ -187,6 +189,7 @@ window.__ModuleLoader__.load({
 
     const STRENGTH_KEY = 'dsh-wechat-bg:strength'
     const FIT_KEY = 'dsh-wechat-bg:fit'
+    const SIDEBAR_KEY = 'dsh-wechat-bg:sidebar'
 
     let state = {
       snap: null,
@@ -195,6 +198,7 @@ window.__ModuleLoader__.load({
       copied: false,
       confirmClear: false,
       strength: readStrength(),
+      sidebar: readSidebar(),
       fit: readFit(),
       cropping: false,
       pendingDelete: null,
@@ -213,8 +217,9 @@ window.__ModuleLoader__.load({
 
     function readStrength() {
       try {
-        const raw = Number(window.localStorage.getItem(STRENGTH_KEY))
-        if (Number.isFinite(raw) && raw >= 0 && raw <= 100) return raw
+        const stored = window.localStorage.getItem(STRENGTH_KEY)
+        const raw = Number(stored)
+        if (stored !== null && stored !== '' && Number.isFinite(raw) && raw >= 0 && raw <= 100) return raw
       } catch {
         /* 隐私模式下 localStorage 不可用 */
       }
@@ -226,6 +231,27 @@ window.__ModuleLoader__.load({
       setState({ strength: next })
       try {
         window.localStorage.setItem(STRENGTH_KEY, String(next))
+      } catch {
+        /* 存不下也不影响当次效果 */
+      }
+    }
+
+    function readSidebar() {
+      try {
+        const stored = window.localStorage.getItem(SIDEBAR_KEY)
+        const raw = Number(stored)
+        if (stored !== null && stored !== '' && Number.isFinite(raw) && raw >= 0 && raw <= 100) return raw
+      } catch {
+        /* 隐私模式下 localStorage 不可用 */
+      }
+      return 60
+    }
+
+    function setSidebar(value) {
+      const next = Math.max(0, Math.min(100, Math.round(value / 5) * 5))
+      setState({ sidebar: next })
+      try {
+        window.localStorage.setItem(SIDEBAR_KEY, String(next))
       } catch {
         /* 存不下也不影响当次效果 */
       }
@@ -326,9 +352,15 @@ window.__ModuleLoader__.load({
 
     /* ── 背景 ───────────────────────────────────────────────────── */
 
-    function backgroundCss(url, strength, fit) {
+    function backgroundCss(url, strength, fit, sidebar) {
       const s = Math.max(0, Math.min(100, Number(strength) || 0)) / 100
-      const a = 0.95 - 0.78 * s
+      /* 一条曲线两处共用，端点写死：0 完全不透明（背景一点都看不到），
+         100 完全透明（照片保持原样，连压暗都没有）。 */
+      const a = Math.pow(1 - s, 0.8)
+      const sb = Math.max(0, Math.min(100, Number(sidebar) || 0)) / 100
+      const as = Math.pow(1 - sb, 0.8)
+      /* 100% 时不能再叠任何渐变，否则照片被压暗，就不是"原样"了 */
+      const bare = s >= 0.999
       const round = (n) => Math.round(n * 100) / 100
       /* 铺满：按 cover 裁到窗口；完整：整张照片放进窗口，两侧留深色底。
          完整模式下照片不能再被窗口裁一次，所以背景色承担留白的底色。 */
@@ -337,15 +369,21 @@ window.__ModuleLoader__.load({
           ? 'html{background-color:#0b0e11 !important;background-image:url("' +
             url +
             '") !important;background-size:contain !important;background-position:center center !important;background-repeat:no-repeat !important;background-attachment:fixed !important}'
-          : 'html{background-color:#e9eef2 !important;background-image:linear-gradient(180deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,.02) 34%,rgba(8,12,16,.12) 100%),url("' +
+          : 'html{background-color:#e9eef2 !important;background-image:' +
+            (bare ? '' : 'linear-gradient(180deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,.02) 34%,rgba(8,12,16,.12) 100%),') +
+            'url("' +
             url +
             '") !important;background-size:cover !important;background-position:center center !important;background-repeat:no-repeat !important;background-attachment:fixed !important}'
       return [
         imageRule,
         'body{background-color:transparent !important}',
         '#root{background-color:transparent !important}',
-        'body{--dsw-alias-bg-base:rgba(255,255,255,' + round(a) + ') !important;--dsw-alias-bg-layer-1:rgba(255,255,255,' + round(Math.min(1, a + .08)) + ') !important;--dsw-alias-bg-layer-2:rgba(255,255,255,' + round(Math.min(1, a + .2)) + ') !important;--dsw-alias-bg-overlay:rgba(255,255,255,' + round(Math.min(1, a + .44)) + ') !important;--dsw-specific-sidebar-fill:rgba(248,249,250,' + round(Math.min(1, a + .05)) + ') !important}',
-        'body[data-ds-dark-theme]{--dsw-alias-bg-base:rgba(20,22,26,' + round(Math.min(1, a + .05)) + ') !important;--dsw-alias-bg-layer-1:rgba(28,30,35,' + round(Math.min(1, a + .12)) + ') !important;--dsw-alias-bg-layer-2:rgba(38,40,46,' + round(Math.min(1, a + .22)) + ') !important;--dsw-alias-bg-overlay:rgba(28,30,34,' + round(Math.min(1, a + .42)) + ') !important;--dsw-specific-sidebar-fill:rgba(26,28,32,' + round(Math.min(1, a + .05)) + ') !important}',
+        'body{--dsw-alias-bg-base:rgba(255,255,255,' + round(a) + ') !important;--dsw-alias-bg-layer-1:rgba(255,255,255,' + round(Math.min(1, a + .08)) + ') !important;--dsw-alias-bg-layer-2:rgba(255,255,255,' + round(Math.min(1, a + .2)) + ') !important;--dsw-alias-bg-overlay:rgba(255,255,255,' + round(Math.min(1, a + .44)) + ') !important;--dsw-specific-sidebar-fill:rgba(248,249,250,' + round(as) + ') !important}',
+        'body[data-ds-dark-theme]{--dsw-alias-bg-base:rgba(20,22,26,' + round(Math.min(1, a + .05)) + ') !important;--dsw-alias-bg-layer-1:rgba(28,30,35,' + round(Math.min(1, a + .12)) + ') !important;--dsw-alias-bg-layer-2:rgba(38,40,46,' + round(Math.min(1, a + .22)) + ') !important;--dsw-alias-bg-overlay:rgba(28,30,34,' + round(Math.min(1, a + .42)) + ') !important;--dsw-specific-sidebar-fill:rgba(26,28,32,' + round(as) + ') !important}',
+        // 左栏：DSH 的 darwin 规则会再乘 90% 透明，导致浓度 0 也压不到全实。
+        // 这里直接给侧栏列上底色，浓度 0 就是真正的不透明，和正文一致。
+        '[class*="sidebarCol"]{background:rgba(248,249,250,' + round(as) + ') !important;background-image:none !important}',
+        'body[data-ds-dark-theme] [class*="sidebarCol"]{background:rgba(26,28,32,' + round(as) + ') !important;background-image:none !important}',
         // 设置面板是覆盖在当前页面上的模态窗口；让它保持不透明，
         // 否则背景照片会透过面板，强度和主题越透明越难阅读。
         'div[data-shortcut-modal="settings"]{background:#fff !important;background-image:none !important}',
@@ -357,7 +395,26 @@ window.__ModuleLoader__.load({
       const store = useStore()
       const url = store.snap && store.snap.imageUrl
       if (!url) return null
-      return h('style', { 'data-dsh-wechat-bg': 'background' }, backgroundCss(url, store.strength, store.fit))
+      return h('style', { 'data-dsh-wechat-bg': 'background' }, backgroundCss(url, store.strength, store.fit, store.sidebar))
+    }
+
+    function Slider(props) {
+      return h(
+        'div',
+        { className: 'dsh-wbg-strength' },
+        h('span', { className: 'dsh-wbg-strengthLabel' }, props.label),
+        h('input', {
+          className: 'dsh-wbg-range',
+          type: 'range',
+          min: 0,
+          max: 100,
+          step: 5,
+          value: props.value,
+          'aria-label': props.label,
+          onChange: (event) => props.onChange(Number(event.target.value)),
+        }),
+        h('span', { className: 'dsh-wbg-strengthValue' }, props.value + '%'),
+      )
     }
 
     function Styles() {
@@ -937,22 +994,10 @@ window.__ModuleLoader__.load({
         status,
         library,
         snap.hasImage
-          ? h(
-              'div',
-              { className: 'dsh-wbg-strength' },
-              h('span', { className: 'dsh-wbg-strengthLabel' }, t('strength')),
-              h('input', {
-                className: 'dsh-wbg-range',
-                type: 'range',
-                min: 0,
-                max: 100,
-                step: 5,
-                value: store.strength,
-                'aria-label': t('strength'),
-                onChange: (event) => setStrength(Number(event.target.value)),
-              }),
-              h('span', { className: 'dsh-wbg-strengthValue' }, store.strength + '%'),
-            )
+          ? h(Slider, { label: t('strength'), value: store.strength, onChange: setStrength })
+          : null,
+        snap.hasImage
+          ? h(Slider, { label: t('sidebar'), value: store.sidebar, onChange: setSidebar })
           : null,
         snap.hasImage
           ? h(

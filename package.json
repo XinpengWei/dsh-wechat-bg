@@ -1,6 +1,6 @@
 {
   "name": "dsh-wechat-bg",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Scan a QR code with WeChat, upload a photo from the phone, and use it as the DSH Web UI background · 微信扫码，手机上传照片，换成 DSH 的全屏背景",
   "type": "module",
   "icon": "icon.svg",
@@ -17,6 +17,7 @@
     "cordis.patch.yml",
     "vendor/qrcode.mjs",
     "vendor/NOTICE.md",
+    "vendor/qrcode-generator-README.md",
     "locale/*.json",
     "icon.svg",
     "README.md",
